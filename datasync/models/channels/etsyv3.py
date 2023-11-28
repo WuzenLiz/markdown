@@ -3,8 +3,10 @@
 import copy
 import io
 from math import prod
+from unicodedata import category
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from numpy import product
 
 import pytz
 import requests
@@ -17,15 +19,17 @@ from datasync.libs.tracking_company import TrackingCompany
 from datasync.libs.utils import *
 from datasync.models.channel import ModelChannel
 from datasync.models.constructs.category import CatalogCategory
-from datasync.models.constructs.order import Order, OrderProducts, OrderItemOption, OrderHistory, OrderAddress, OrderAddressCountry
+from datasync.models.constructs.order import Order, OrderProducts, OrderItemOption, OrderHistory, OrderAddress, \
+    OrderAddressCountry
 from datasync.models.constructs.product import Product, ProductImage, ProductAttribute, ProductVariant, \
     ProductVariantAttribute, ProductVideo, ProductLocation
 import dateutil.relativedelta
 
 class ModelChannelsEtsyV3(ModelChannel):
-    USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"
+    USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/80.0.3987.149 Safari/537.36")
     PRODUCT_STATUS = ['active', 'inactive', 'draft', 'expired', 'sold_out']
-    
+
     def __init__(self):
         super().__init__()
         self._api_url = None
@@ -62,11 +66,12 @@ class ModelChannelsEtsyV3(ModelChannel):
         self._product_pull_type = "publish"
         self._category_id = None
 
-    def create_api_url(self):
+    @staticmethod
+    def create_api_url():
         api_url = f"{get_config_ini('etsyv3', 'api_url')}"
         return api_url
 
-    def _checkToken(self,token):
+    def _check_token(self, token):
         if token and token != 'false' or token != 'False':
             path = f'/application/shops/{self._state.channel.config.api.shop_id}/listings'
             method = 'GET'
@@ -74,7 +79,7 @@ class ModelChannelsEtsyV3(ModelChannel):
                 'Authorization': f'Bearer {token}',
                 'x-api-key': f'{self._state.channel.config.api.consumer_key}',
                 'limit': '1',
-                }
+            }
             url = f"{self._api_url}/{path}"
             res = requests.request(method, url, headers=header)
             if res.status_code == 200 or 'access token is expired' not in res.text:
@@ -86,24 +91,26 @@ class ModelChannelsEtsyV3(ModelChannel):
     def get_max_last_modified_product(self):
         if self._state.pull.process.products.last_modified:
             if to_str(self._state.pull.process.products.last_modified).isnumeric():
-                return convert_format_time(self._state.pull.process.products.last_modified, new_format = "%Y-%m-%dT%H:%M:%S+07:00")
+                return convert_format_time(self._state.pull.process.products.last_modified,
+                                           new_format="%Y-%m-%dT%H:%M:%S+07:00")
             return self._state.pull.process.products.last_modified
         return False
 
-    def getAuthAccessToken(self):
-        if self._checkToken(self._state.channel.config.api.access_token):
+    def get_auth_access_token(self):
+        if self._check_token(self._state.channel.config.api.access_token):
             return self._state.channel.config.api.access_token
         else:
             if self._state.channel.config.api.access_token_secret:
                 path = '/public/oauth/token'
                 method = 'POST'
-                data = f"grant_type=refresh_token&refresh_token={self._state.channel.config.api.access_token_secret}&client_id={self._state.channel.config.api.consumer_key}"
+                data = f"grant_type=refresh_token&refresh_token={self._state.channel.config.api.access_token_secret}\
+                        &client_id={self._state.channel.config.api.consumer_key}"
                 header = {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 }
-                
+
                 res = requests.request(method=method, url=f"{self._api_url}{path}", headers=header, data=data)
-                print(res,res.text)
+                print(res, res.text)
                 if res.status_code == 200:
                     data = res.json()
                     self._state.channel.config.api.access_token = data['access_token']
@@ -126,31 +133,24 @@ class ModelChannelsEtsyV3(ModelChannel):
             headers = {
                 'Content-Type': 'application/json',
                 'x-api-key': f'{self._state.channel.config.api.consumer_key}',
-                'Authorization': f'Bearer {self.getAuthAccessToken()}'
+                'Authorization': f'Bearer {self.get_auth_access_token()}'
             }
-        if not headers['x-api-key'] or headers['Authorization']:
+        if not headers.get('x-api-key') or headers.get('Authorization'):
             headers = {
                 'x-api-key': f'{self._state.channel.config.api.consumer_key}',
-                'Authorization': f'Bearer {self.getAuthAccessToken()}'
+                'Authorization': f'Bearer {self.get_auth_access_token()}'
             }
         res = self.requests(url=url, method=method, headers=headers, data=data, files=files)
-        retry = 0
-        print(f"\nbbbbbbbbb{res}\n")
-        while res.status_code == 429 and retry < 3:
-            retry += 1
-            time.sleep(5)
-            res = self.requests(url=url, method=method, headers=headers, data=data, files=files)
         return res
 
-    def requests(self, url, method = 'get', headers=None, data=None, files=None):
+    def requests(self, url, method='get', headers=None, data=None, files=None):
         method = to_str(method).lower()
         if not headers:
-            headers = {}
-            headers['User-Agent'] = get_random_useragent()
+            headers = {'User-Agent': get_random_useragent()}
         elif isinstance(headers, dict) and 'User-Agent' not in headers:
             headers['User-Agent'] = get_random_useragent()
         headers['Accept'] = 'application/json'
-        
+
         response = False
         request_options = {
             'headers': headers,
@@ -168,7 +168,6 @@ class ModelChannelsEtsyV3(ModelChannel):
                 if 'Content-Type' not in headers:
                     headers['Content-Type'] = 'application/json'
         request_options = self.combine_request_options(request_options)
-        print(f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{url}\n{headers}")
         response_data = False
         try:
             response = requests.request(method, url, **request_options)
@@ -197,7 +196,7 @@ class ModelChannelsEtsyV3(ModelChannel):
             else:
                 time.sleep(1)
 
-            def log_request_error(_log_type = 'request'):
+            def log_request_error(_log_type='request'):
                 if not _log_type:
                     _log_type = 'request'
                 error = {
@@ -207,21 +206,22 @@ class ModelChannelsEtsyV3(ModelChannel):
                     'header': to_str(response.headers),
                     'response': response.text,
                 }
-                self.log_request_error(url, log_type = _log_type ,**error)
+                self.log_request_error(url, log_type=_log_type, **error)
 
             if response.status_code == 401:
                 if response_data.errors and 'Invalid' in to_str(response_data.errors):
                     log_request_error()
                     self.notify(Errors.ETSY_API_AUTH_INVALID)
-                    headers['Authorization'] = f'Bearer {self.getAuthAccessToken()}'
+                    headers['Authorization'] = f'Bearer {self.get_auth_access_token()}'
                     return self.requests(url, headers, data, method)
             if response.status_code > 201 or self.is_log():
                 log_request_error(self._file_log)
         except Exception as e:
             self.log_traceback()
+            return False
         return response_data
 
-    def check_response_import(self, response, convert, entity_type = ''):
+    def check_response_import(self, response, convert, entity_type=''):
         entity_id = convert.id if convert.id else convert.code
         if not response:
             return Response().error()
@@ -246,7 +246,7 @@ class ModelChannelsEtsyV3(ModelChannel):
             msg_errors = '_lic_nl_'.join(console)
             self.log(entity_type + ' id ' + to_str(entity_id) + ' import failed. Error: ' + msg_errors,
                      "{}_errors".format(entity_type))
-            return Response().error(msg = msg_errors)
+            return Response().error(msg=msg_errors)
 
         else:
             return Response().success()
@@ -260,52 +260,263 @@ class ModelChannelsEtsyV3(ModelChannel):
             self._state.pull.process.products.error = 0
             self._state.pull.process.products.imported = 0
             self._state.pull.process.products.new_entity = 0
+            self._state.pull.process.products.total=0
             params['limit'] = self._request_data.get('limit', 25)
             params['offset'] = self._request_data.get('offset', 0)
-            if self._request_data.get('include_filters'):
-                for k,v in self._request_data.get('include_filters').items():
-                    if k in ["Shipping","Images","Shop","User","Translations","Inventory","Videos"]:
-                        params['includes'] += f",{k}"
+            params['includes'] = "Shipping,Images,Shop,User,Translations,Inventory,Videos"
             if self.is_refresh_process():
                 params['offset'] = 0
-                params['limit'] = self._state.pull.process.products.total
-                last_modified = self.get_max_last_modified_product()
-                if last_modified:
-                    params['last_modified'] = last_modified
+                params['limit'] = self._state.pull.process.setting.products or 25
+                self._state.pull.process.products.id_src = 0
             else:
-                if self._state.pull.process.products.total > 0:
-                    params['offset'] = self._state.pull.process.products.total
-                for type in self.PRODUCT_STATUS:
-                    params['state'] = type
-                    products = self.pull_products(params)
-                    if products:
-                        self._state.pull.process.products.total += products.count()
-                        if self._state.pull.process.products.total > params['limit']:
-                            params['offset'] = params['limit']
-                            params['limit'] = self._state.pull.process.products.total - params['limit']
-                        products = self.pull_products(params)
+                params['offset'] = self._state.pull.process.products.id_src or 0
+            statuses = ['active']
+            if self._request_data.get('import_all'):
+                statuses = self.PRODUCT_STATUS
+            else:
+                statuses += [status for status in self.PRODUCT_STATUS if self._request_data.get(f'include_{status}')]
+            for status in statuses:
+                params['state'] = status
+                products = self.pull_products(params)
+                if products and products.count > 0:
+                    self._state.pull.process.products.total += products.count
+        if self.is_order_process():
+            self._state.pull.process.orders.total = 0
+            self._state.pull.process.orders.imported = 0
+            self._state.pull.process.orders.new_entity = 0
+            self._state.pull.process.orders.error = 0
+            self._state.pull.process.orders.id_src = 0
+            order_api = self.api(f"/application/shops/{self._state.channel.config.api.shop_id}/receipts")
+            self._state.pull.process.orders.total = json.loads(order_api)["count"]
+
+        if self.is_category_process():
+            self._state.pull.process.categories.total = 0
+            self._state.pull.process.categories.imported = 0
+            self._state.pull.process.categories.new_entity = 0
+            self._state.pull.process.categories.error = 0
+            self._state.pull.process.categories.total = 1
+        return Response().success()
 
     def pull_products(self, params):
         if not self._api_url:
             self._api_url = self.create_api_url()
-        url = f"{self._api_url}/application/shops/{self._state.channel.config.api.shop_id}/listings"
+        #convert params to query string
+        query_string = urlencode(params) if params else ''
+        url = f"{self._api_url}/application/shops/{self._state.channel.config.api.shop_id}/listings?{query_string}"
         headers = {
             'Content-Type': 'application/json',
             'x-api-key': f'{self._state.channel.config.api.consumer_key}',
-            'Authorization': f'Bearer {self.getAuthAccessToken()}'
+            'Authorization': f'Bearer {self.get_auth_access_token()}'
         }
-        res = self.requests(url, 'GET', headers, params)
-        if res.status_code == 200:
-            return res.data
+        res = self.requests(url, 'GET', headers)
+        if self._last_status == 200:
+            return res
         return False
 
-    def convert_to_etsy_product(self, convert, product, products_ext):
+    def get_product_by_id(self, product_id):
+        includes= "Shipping,Images,Shop,User,Translations,Inventory,Videos"
+        product = self.api(method='GET', extpath=f'/application/listings/batch?listing_ids={product_id}&includes={includes}')
+        if self._last_status == 404:
+            return Response().create_response(result=Response().ERROR, msg='Product not found')
+        if not product or not product.results:
+            return Response().error()
+        return Response().success(data=product.results[0])
+    
+    def get_product_id_import(self, convert: Product, product, products_ext):
+        return product.listing_id
+    
+    def get_products_main_export(self):
+        if self._flag_finish_product:
+            return Response().finish()
+        params = dict()
+        products = list()
+        limit_data = 2
+        params = {
+            'limit': limit_data,
+             
+        }
+        if self._product_next_link:
+            params['offset'] = self._state.pull.process.products.imported
+        else:
+            params['offset'] = self._state.pull.process.products.imported or 0
+        params['includes'] = "Shipping,Images,Shop,User,Translations,Inventory,Videos"
+        statuses = ['active']
+        if self._request_data.get('import_all'):
+            statuses = self.PRODUCT_STATUS
+        else:
+            statuses += [ status for status in self.PRODUCT_STATUS if self._request_data.get(f'include_{status}')]
+        for status in statuses:
+            params['state'] = status
+            products_req = self.pull_products(params)
+            if not products_req:
+                return Response().error()
+            if products_req.count == 0 or len(products_req.results) == 0:
+                continue
+            # if len(products_req.results) < limit_data:
+            #     self._flag_finish_product = True
+            products += products_req.results
+        if len(products) == 0 or not products:
+            return Response().finish()
+        if self._state.pull.process.products.total >= self._state.pull.process.products.imported:
+            self._product_next_link = True
+        else:
+            self._flag_finish_product = True
+        return Response().success(data = products)
+
+    def get_products_ext_export(self, products):
+        if not products:
+            return Response().error(Errors.ETSY_GET_PRODUCT_FAILED, 'Get product failed')
+        extend = Prodict()
+        for product in products:
+            product_id = to_str(product.listing_id)
+            extend[to_str(product_id)] = product
+        return Response().success(extend)
+
+    def check_product_import(self, product_id, convert: Product):
+        path = f"/application/shops/{self._state.channel.config.api.shop_id}/listings"
+        product_list = self.api(method='GET', extpath=path).results
+        key_to_find = "sku"
+        value_to_find = convert.sku
+        result = [item for item in product_list if item.get(key_to_find) == value_to_find]
+        if len(result) == 0:
+            return False
+        else:
+            return str(result[0]["id"])
+
+    def get_taxonomies_name(self, taxonomies_id):
+        taxonomies= self.api(method='GET', extpath=f'/application/seller-taxonomy/nodes')
+        if not taxonomies:
+            return False
+        taxonomies = taxonomies.results
+        product_taxonomies = next((item for item in taxonomies if item['id'] == taxonomies_id), None)
+        if not product_taxonomies:
+            return False
+        else:
+            # preverse to parent taxonomies for full path name
+            mame_path_ids = sorted(product_taxonomies['full_path_taxonomy_ids'])
+            # Create name path as format root > child > ... > current
+            name_path = ' > '.join([next((item for item in taxonomies if item['id'] == id), None)['name'] for id in mame_path_ids])
+            return name_path
+    
+    def _convert_product_export(self, product, products_ext: Prodict):
+        product_id = f'{product.listing_id}'
+        product_data = Product()
+        product_data.tags = (', ').join(product.tags)
+        product_data.id = product_id
+        product_data.is_variant = False
+        product_data.sku = product.skus[0] if len(product.skus) > 0 else ''
+        product_data.skus = product.skus
+        product_data.name = product.title
+        product_data.price = product.price.amount
+        product_data.cost = product.price.amount
+        product_data.status = product.state
+        product_data.qty = product.quantity
+        product_data.weight = product.weight
+        product_data.length = product.length
+        product_data.width = product.width
+        product_data.height = product.height
+        product_data.length = product.length
+        product_data.width = product.width
+        product_data.height = product.height
+        product_data.weight_units = product.item_weight_unit
+        product_data.dimension_units = product.item_dimensions_unit
+        product_data.description = product.description
+        product_data.created_at = product.creation_tsz
+        product_data.updated_at = product.last_modified_tsz
+        product_data.visibility = product.state
+        product_data.is_in_stock = True if product.quantity > 0 else False
+        product_data.manage_stock = True
+        product_data.is_salable = True
+        product_data.type = 'simple'
+        product_data.url_key = product.listing_id
+        product_data.url_path = product.url
+        product_data.brand = product.brand
+        if product.images and len(product.images) > 0:
+            for image in product.images:
+                if image.url_fullxfull:
+                    product_data.images.append(ProductImage().from_dict({
+                        'url': image.url_fullxfull,
+                        'position': image.rank,
+                        'label': image.alt_text,
+                        'image_id': image.listing_image_id,
+                    }))
+        
+        if product.inventory and product.inventory.products:
+            # product.inventory.products is variants in with contruct of etsy
+            for variant in product.inventory.products:
+                variant_data = ProductVariant()
+                variant_data.id = variant.product_id
+                variant_data.sku = variant.sku
+                variant_data.qty = product.quantity
+                variant_data.price = variant.offerings[0].price.amount
+                variant_data.cost = variant.offerings[0].price.amount
+                variant_data.is_salable = True
+                variant_data.is_in_stock = True if variant.offerings[0].quantity > 0 else False
+                variant_data.visibility = True if variant.offerings[0].is_enabled else False
+                variant_data.created_at = product.creation_tsz
+                variant_data.updated_at = product.last_modified_tsz
+                variant_data.images = product_data.images
+                variant_data.attributes = []
+                variant_data.parent_id = product_id
+                if not variant.property_values:
+                    continue
+                else:
+                    for p in variant.property_values:
+                        if isinstance(p.get('value_ids'), list) and isinstance(p.get('values'), list) and len(p.get('value_ids')) > 0:
+                            variant_data.attributes.append(ProductVariantAttribute().from_dict({
+                                'attribute_id': p.get('property_id'),
+                                'attribute_name': p.get('property_name'),
+                                'attribute_value_id': p.get('value_ids')[0],
+                                'attribute_value_name': p.get('values')[0],
+                            }))
+                            product_data.attributes.append(ProductAttribute().from_dict({
+                                'attribute_id': p.get('property_id'),
+                                'attribute_name': p.get('property_name'),
+                                'attribute_value_id': p.get('value_ids')[0],
+                                'attribute_value_name': p.get('values')[0],
+                            }))
+                product_data.variants.append(variant_data)
+        # extend data: Template_data
+        product_data.template_data = Prodict()
+        product_data.template_data.category = {
+            "about": {
+                'who_made': product.who_made,
+                'is_supply': product.is_supply,
+                'when_made': product.when_made,
+                'production_partner_ids': product.production_partners,
+            },
+            "category": {
+                'id': product.taxonomy_id,
+                'name': self.get_taxonomies_name(product.taxonomy_id),
+            },
+            "advance": {
+                'materials': product.materials,
+                'tags': (',').join(product.tags),
+                'section': product.shop_section_id,
+            },
+            "attributes": [],
+        }
+        product_data.template_data.shipping = {
+            "shipping_id": product.shipping_profile_id,
+            "policy_id": product.return_policy_id,
+        }
+        if product.is_personalizable:
+            product_data.template_data.personalization = {
+                'status': 'enabled',
+                'is_required': product.personalization_is_required,
+                'char_count_max': product.personalization_char_count_max,
+                'instructions': product.personalization_instructions,
+            }
+        return Response().success(data=product_data)
+
+    @staticmethod
+    def convert_to_etsy_product(convert, product, products_ext):
         if not product.name:
             return Response().error(Errors.PRODUCT_DATA_INVALID, 'Product name is empty')
         product_data = {
             'title': product.get('name'),
-            'price': product.get('price'),
-            'quantity': product.get('qty'),
+            'price': product.get('price') if to_int(product.get('price')) < 50000 else 500,
+            'quantity': 10,
             'state': product.get('status'),
             'taxonomy_id': product.template_data.category.category.id,
             'who_made': product.template_data.category.about.who_made,
@@ -352,7 +563,7 @@ class ModelChannelsEtsyV3(ModelChannel):
                         'overwrite': True,
                         'alt_text': image.label or '',
                     })
-        return Response().success((product_data,images))
+        return Response().success((product_data, images))
 
     def set_last_product_response(self, response, images):
         self._last_product_response = response
@@ -366,7 +577,8 @@ class ModelChannelsEtsyV3(ModelChannel):
         if not converted_product:
             return converted_product
         productcv, images = converted_product.data
-        res = self.api(method='POST', extpath=f'/application/shops/{self._state.channel.config.api.shop_id}/listings', data=productcv)
+        res = self.api(method='POST', extpath=f'/application/shops/{self._state.channel.config.api.shop_id}/listings',
+                       data=productcv)
         check_res = self.check_response_import(res, product, 'product')
         if check_res.result != Response().SUCCESS:
             return check_res
@@ -391,20 +603,24 @@ class ModelChannelsEtsyV3(ModelChannel):
             for image in images:
                 if image['image']:
                     # download image and post to etsy
-                    img = urlopen(image['image']).read()
-                    if img[1:4] == b'PNG':
-                        process = Image.open(io.BytesIO(img)).convert('RGBA')
-                        new_img = Image.new("RGBA", process.size, "WHITE")
-                        new_img.paste(process, mask=process)
-                        process = new_img.convert('RGB')
-                        img = io.BytesIO()
-                        process.save(img, format='JPEG')
-                        img = img.getvalue()
+                    try:
+                        img = urlopen(image['image']).read()
+                        if img[1:4] == b'PNG':
+                            process = Image.open(io.BytesIO(img)).convert('RGBA')
+                            new_img = Image.new("RGBA", process.size, "WHITE")
+                            new_img.paste(process, mask=process)
+                            process = new_img.convert('RGB')
+                            img = io.BytesIO()
+                            process.save(img, format='JPEG')
+                            img = img.getvalue()
+                    except Exception as e:
+                        img = None
+                        continue
                     if img:
                         image.pop('image')
                         headers = {
                             'x-api-key': f'{self._state.channel.config.api.consumer_key}',
-                            'Authorization': f'Bearer {self.getAuthAccessToken()}'
+                            'Authorization': f'Bearer {self.get_auth_access_token()}'
                         }
                         payload = {
                             'rank': image['rank'],
@@ -412,80 +628,119 @@ class ModelChannelsEtsyV3(ModelChannel):
                             'alt_text': image['alt_text'],
                         }
                         files = [('image', img)]
-                        res = self.api(method='POST', extpath=f'/application/shops/{self._state.channel.config.api.shop_id}/listings/{product_id}/images', headers=headers, files=files, data=payload)
+                        path = f'/application/shops/{self._state.channel.config.api.shop_id}/listings/{product_id}/images'
+                        res = self.api(method='POST',
+                                       extpath=path,
+                                       headers=headers, files=files, data=payload)
                         if not res.errors:
                             image['id'] = res.listing_image_id
+                            print("PUSH IMAGE DONE")
                         else:
                             return Response().error()
                     else:
                         continue
                 else:
                     continue
-        if product.template_data.advance:
-            get_properties_path = f'/application/seller-taxonomy/nodes/{product.template_data.category.category.id}/properties'
-            properties = self.api(method='GET', extpath=get_properties_path)
-            find_by_key = lambda l,k,v: next((i for i in l if i[k] == v), None)
-            get_number_from_string = lambda s: ''.join([i for i in s if i.isdigit()])
+        path = f'/application/seller-taxonomy/nodes/{lastrep.taxonomy_id}/properties'
+        properties = self.api(method='GET', extpath=path)
+        if not properties:
+            return Response().error()
+        properties = properties.results
+        def find_by_key(list_dict, key, value):
+            list_key = key.split(',')
+            if isinstance(list_key,list):
+                for k in list_key:
+                    data = next((item for item in list_dict if item[k] == value), None)
+                    return data if data else False
+        if product.template_data.category.advance:
+            print("PUSH PROPERTY")
             if properties:
-                for attribute in product.template_data.advance.attributes:
-                    property_data = find_by_key(properties, 'property_id', attribute.attribute_id)
-                    if not property_data:
+                for attribute in product.template_data.category.advance.attributes:
+                    payload = {}
+                    possible_propeties_values = find_by_key(properties, 'property_id', attribute.attribute_id)
+                    if not possible_propeties_values:
                         continue
+                    possible_propeties_values = possible_propeties_values['possible_values']
                     if attribute.attribute_value:
-                        property_name = find_by_key(property_data["possible_values"],"value_id",int(attribute.attribute_value))["name"]
-                        value_ids = []
-                        values = []
-                        value_ids.append(attribute.attribute_value)
-                        values.append(property_name)
-                        payload=urlencode({'value_ids': ', '.join(str(x) for x in value_ids).replace(" ","")}, doseq = False) + '&' + urlencode({'values': ', '.join(values)}, doseq=False)
-                        path = f"/application/shops/{self._state.channel.config.api.shop_id}/listings/{product_id}/properties/{attribute.attribute_id}"
-                        headers = {
-                            'Content-Type': 'application/x-www-form-urlencoded',
+                        property_name = find_by_key(possible_propeties_values, "value_id", int(attribute.attribute_value))["name"]
+                        payload = {
+                            'value_ids': [attribute.attribute_value],
+                            'values': [property_name],
                         }
-                        self.api(method="PUT",extpath=path,headers=headers,data=payload)
+                    path = f"/application/shops/{self._state.channel.config.api.shop_id}/listings/{product_id}/properties/{attribute.attribute_id}"
+                    headers = {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    }
+                    self.api(method="PUT", extpath=path, headers=headers, data=payload)
+                print("PUSH PROPERTY DONE")
         if product.variants:
+            print("PUSH VARIANT")
             inventory_variants = list()
             for variant in product.variants:
-                list_variant_name = [ _.attribute_name for _ in variant.attributes] 
-                list_variant_value_name = [ _.attribute_value_name for _ in variant.attributes]
-                variant_request_data = {
-                    "sku": product.sku,
-                    "property_values": [
-                        {
-                        "property_id": 513,
-                        "value_ids": [
-
+                list_variant_attribute = [_.attribute_name for _ in variant.attributes]
+                list_variant_attribute_value = [_.attribute_value_name for _ in variant.attributes]
+                if len(list_variant_attribute) >= 2:
+                    # if property not exist in etsy, create new property and push variant property_id: 513, 514
+                    variant_request_data = {
+                        "sku": product.sku,
+                        "property_values": [
+                            {
+                                "property_id": 513,
+                                "value_ids": [
+                                ],
+                                "property_name": list_variant_attribute[0],
+                                "values": [
+                                    list_variant_attribute_value[0],
+                                ]
+                            },
+                            {
+                                "property_id": 514,
+                                "value_ids": [
+                                ],
+                                "property_name": ('-').join(list_variant_attribute[1:]),
+                                "values": [
+                                    ('-').join(list_variant_attribute_value[1:]),
+                                ]
+                            },
                         ],
-                        "property_name": list_variant_name[0],
-                        "values": [
-                            list_variant_value_name[0],
+                        "offerings": [
+                            {
+                                "price": product.price if to_int(product.price) < 50000 else 500,
+                                "quantity": product.qty if product.qty > 0 or product.qty < 1000 else 999,
+                                "is_enabled": True if not variant.invisible else False
+                            }
                         ]
-                        },
-                        {
-                        "property_id": 514,
-                        "value_ids": [
-                            
+                    }
+                    inventory_variants.append(variant_request_data)
+                elif len(list_variant_attribute) <= 1:
+                    variant_request_data = {
+                        "sku": product.sku,
+                        "property_values": [
+                            {
+                                "property_id": 513,
+                                "value_ids": [
+                                ],
+                                "property_name": list_variant_attribute[0],
+                                "values": [
+                                    list_variant_attribute[0],
+                                ]
+                            },
                         ],
-                        # "property_name": variant.attributes[1].attribute_name +"-"+ variant.attributes[2].attribute_name,
-                        "property_name": ('-').join(list_variant_name[1:]),
-                        "values": [
-                            ('-').join(list_variant_value_name[1:]),
+                        "offerings": [
+                            {
+                                "price": product.price if to_int(product.price) < 50000 else 500,
+                                "quantity": product.qty if product.qty > 0 or product.qty < 1000 else 999,
+                                "is_enabled": True if not variant.invisible else False
+                            }
                         ]
-                        }
-                    ],
-                    "offerings": [
-                        {
-                        "price": variant.price,
-                        "quantity": variant.qty if variant.qty else 1,
-                        "is_enabled": variant.visible
-                        }
-                    ]
+                    }
+                    inventory_variants.append(variant_request_data)
+                else:
+                    continue
+                payload = {
+                    'products': inventory_variants
                 }
-                inventory_variants.append(variant_request_data)
-            payload = {
-                'products':inventory_variants
-            }
-            path=f"/application/listings/{product_id}/inventory"
-            self.api(method="PUT",extpath=path,data=payload)
+                path = f"/application/listings/{product_id}/inventory"
+                self.api(method="PUT", extpath=path, data=payload)
         self._extend_product_map = copy.deepcopy(eemap)
-        return Response ().success()
+        return Response().success()
