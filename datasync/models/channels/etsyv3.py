@@ -61,7 +61,6 @@ class ModelChannelsEtsyV3(ModelChannel):
         self._attributes = dict()
         self._all_attributes = dict()
         self._flag_finish_category = False
-        self._category_next_page = 1
         self._product_images = {}
         self._product_pull_type = "publish"
         self._category_id = None
@@ -110,7 +109,7 @@ class ModelChannelsEtsyV3(ModelChannel):
                 }
 
                 res = requests.request(method=method, url=f"{self._api_url}{path}", headers=header, data=data)
-                print(res, res.text)
+                # print(res, res.text)
                 if res.status_code == 200:
                     data = res.json()
                     self._state.channel.config.api.access_token = data['access_token']
@@ -174,7 +173,7 @@ class ModelChannelsEtsyV3(ModelChannel):
             self._last_header = response.headers
             self._last_status = response.status_code
             response_data = json_decode(response.text)
-            print(f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{response_data}\n")
+            # print(f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{response_data}\n")
             if response_data:
                 try:
                     response_prodict = Prodict(**response_data)
@@ -330,7 +329,7 @@ class ModelChannelsEtsyV3(ModelChannel):
             return Response().finish()
         params = dict()
         products = list()
-        limit_data = 2
+        limit_data = self._state.pull.setting.products or 25
         params = {
             'limit': limit_data,
              
@@ -388,7 +387,17 @@ class ModelChannelsEtsyV3(ModelChannel):
         if not taxonomies:
             return False
         taxonomies = taxonomies.results
-        product_taxonomies = next((item for item in taxonomies if item['id'] == taxonomies_id), None)
+        # ultra deep level search for taxonomies (recursive)
+        def udsft(taxonomies, taxonomies_id):
+            for taxonomy in taxonomies:
+                if taxonomy['id'] == taxonomies_id:
+                    return taxonomy
+                elif taxonomy['children']:
+                    return udsft(taxonomy['children'], taxonomies_id)
+                else:
+                    continue
+            return False
+        product_taxonomies = udsft(taxonomies, taxonomies_id)
         if not product_taxonomies:
             return False
         else:
@@ -475,6 +484,7 @@ class ModelChannelsEtsyV3(ModelChannel):
                                 'attribute_value_id': p.get('value_ids')[0],
                                 'attribute_value_name': p.get('values')[0],
                             }))
+                            # print('a')
                 product_data.variants.append(variant_data)
         # extend data: Template_data
         product_data.template_data = Prodict()
@@ -507,7 +517,7 @@ class ModelChannelsEtsyV3(ModelChannel):
                 'char_count_max': product.personalization_char_count_max,
                 'instructions': product.personalization_instructions,
             }
-        return Response().success(data=product_data)
+        return Response().success(product_data)
 
     @staticmethod
     def convert_to_etsy_product(convert, product, products_ext):
@@ -634,7 +644,7 @@ class ModelChannelsEtsyV3(ModelChannel):
                                        headers=headers, files=files, data=payload)
                         if not res.errors:
                             image['id'] = res.listing_image_id
-                            print("PUSH IMAGE DONE")
+                            # print("PUSH IMAGE DONE")
                         else:
                             return Response().error()
                     else:
@@ -653,7 +663,7 @@ class ModelChannelsEtsyV3(ModelChannel):
                     data = next((item for item in list_dict if item[k] == value), None)
                     return data if data else False
         if product.template_data.category.advance:
-            print("PUSH PROPERTY")
+            # print("PUSH PROPERTY")
             if properties:
                 for attribute in product.template_data.category.advance.attributes:
                     payload = {}
@@ -672,9 +682,9 @@ class ModelChannelsEtsyV3(ModelChannel):
                         'Content-Type': 'application/x-www-form-urlencoded',
                     }
                     self.api(method="PUT", extpath=path, headers=headers, data=payload)
-                print("PUSH PROPERTY DONE")
+                # print("PUSH PROPERTY DONE")
         if product.variants:
-            print("PUSH VARIANT")
+            # print("PUSH VARIANT")
             inventory_variants = list()
             for variant in product.variants:
                 list_variant_attribute = [_.attribute_name for _ in variant.attributes]
