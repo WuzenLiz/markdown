@@ -1,4 +1,5 @@
 # Pseudo code for all functions and actions
+---
 ## Action
 ### Action: `Setup channel`
     Setup channel Là một action để lấy và kiểm tra thông tin của channel
@@ -50,7 +51,10 @@
     + `{entity}_import`: Thực hiện việc lưu dữ liệu của `entity` vào database
     + `after_{entity}_import`: Hâu xử lý sau khi lưu dữ liệu của `entity` vào database
 - Flow:
-``` Display_pull_channel -> get_{entity}_main_export -> get_{entity}_ext -> check_{entity}_import -> convert_{entity}_import -> {entity}_import -> after_{entity}_import ```
+```mermaid
+    flowchart LR 
+    A[Display_pull_channel] --> B[get_entity_main_export] --> C[get_entity_ext] --> D[check_entity_import] --> E[convert_entity_import] --> F[entity_import] --> G[after_entity_import]
+```
 - Chart:
     + Display_pull_channel
     ```mermaid
@@ -62,13 +66,14 @@
         C --> |Không có thông tin| E[Trả về lỗi]
         C --> |Có thể gọi api| F[Trả về/lưu vào state]
     ```
+
     + get_{entity}_main_export
     ```mermaid 
     ---
     title: get_{entity}_main_export flowchart tổng quát
     ---
     flowchart LR
-     A[Lấy dữ liệu từ state] --> B[Khởi tạo params, request body] --> C[Truy vấn API] --> D[Xử lý và trả về dữ liệu]
+     Start([Start])-->A[Lấy dữ liệu từ state] --> B[Khởi tạo params, request body] --> C[Truy vấn API] --> D[Xử lý] --> End([End: Trả về dữ liệu])
     ```
 
     ```mermaid
@@ -78,15 +83,49 @@
             theme: forest
             curve: basis 
     ---
-    flowchart TD
+    flowchart LR
     START([Start])-->A{kiểm tra trạng thái lần cuối}
     A --> |Đã hoàn thành| End([Trả về Response])
-    A --> |Chưa hoàn thành| B[Khởi tạo params, request body]
-    B --> C[Truy vấn API] --> D{Kiểm tra phân trang}
+    A --> |Chưa hoàn thành| B[Khởi tạo params,<br>request body] --> C[Truy vấn API] --> D{Kiểm tra phân trang}
     D --> |Có phân trang: trang tiếp theo| E[Lưu lại url phân trang] --> F1{kiểm tra dữ liệu entity}
     D --> |không có phân trang| F1{kiểm tra dữ liệu entity} 
     F1 --> |Có dữ liệu| End
-    F1 --> |Không có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
-    F1 --> |Có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
-    F1 --> |Không có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
+    F1 --> |Không có dữ liệu| G[Flag trạng thái<br>đã hoàn thành] --> End
+    F1 --> |Có dữ liệu| G --> End
+    F1 --> |Không có dữ liệu| G --> End
+    ```
+
+    + get_{entity}_ext
+    ```mermaid
+    ---
+        title: get_{entity}_ext flowchart
+        config: 
+            theme: forest
+            curve: basis
+    ---
+    flowchart LR
+    START([Start])-->Data(maindata) --> A{id}
+    A --> |Có dữ liệu| B[Truy vấn API]
+    %%MAP extdata to maindata[id]%%
+    B --> C[Merge dữ liệu]
+    C --> End([End])
+    A --> End([End])
+    ```
+    ```mermaid
+    sequenceDiagram 
+        participant C as Controller
+        participant B as Channel
+        participant A as Action
+        C->>B: get_{entity}_ext
+        loop for id in maindata
+            B->>A: id
+            alt có id
+                A->>A: Truy vấn API
+                A->>B: API data
+                B->>B: Maping data
+            else không có id
+                A->>B: flag[end]
+            end
+        end
+        B->>C: Extdata
     ```
