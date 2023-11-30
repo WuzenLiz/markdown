@@ -72,16 +72,21 @@
     ```
 
     ```mermaid
-    %%{init: {"flowchart": {"htmlLabels": Xử lý chi tiết}} }%%
+    ---
+        title: get_{entity}_main_export flowchart chi tiết
+        config: 
+            theme: forest
+            curve: basis 
+    ---
     flowchart TD
     START([Start])-->A{kiểm tra trạng thái lần cuối}
-    A --> |Đã hoàn thành| End([End])
+    A --> |Đã hoàn thành| End([Trả về Response])
     A --> |Chưa hoàn thành| B[Khởi tạo params, request body]
     B --> C[Truy vấn API] --> D{Kiểm tra phân trang}
     D --> |Có phân trang: trang tiếp theo| E[Lưu lại url phân trang] --> F1{kiểm tra dữ liệu entity}
-    D --> |không có phân trang| F2{kiểm tra dữ liệu entity} 
-    F1 --> |Có dữ liệu| F[Trả về dữ liệu] --> H[trả về Response: entity_Data] --> End
+    D --> |không có phân trang| F1{kiểm tra dữ liệu entity} 
+    F1 --> |Có dữ liệu| End
     F1 --> |Không có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
-    F2 --> |Có dữ liệu| F[Trả về dữ liệu] --> G[Flag trạng thái đã hoàn thành] --> H[trả về Response: entity_Data] --> End
-    F2 --> |Không có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
+    F1 --> |Có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
+    F1 --> |Không có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
     ```
