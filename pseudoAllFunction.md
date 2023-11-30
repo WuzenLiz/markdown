@@ -1,14 +1,47 @@
-# Pseudo code for all functions and actions
+#Chart
 ---
 ## Table of contents
-- [Pseudo code for all functions and actions](#pseudo-code-for-all-functions-and-actions)
-  - [Table of contents](#table-of-contents)
-  - [Action](#action)
+- [Table of contents](#table-of-contents)
+- [Function](#function)
+    - [Function: `get_api_info`](#function-get_api_info)
+- [Action](#action)
     - [Action: `Setup channel`](#action-setup-channel)
     - [Action: `Pull channel`](#action-pull-channel)
 ---
+## Function
+### Function: `get_api_info`
+> get_api_info là một function để lấy thông tin cần thiết để gọi api của channel
+### Function: `get_channel_info`
+> get_channel_info là một function để gọi và kiểm tra thông tin đã được cung cấp bởi channel
+```mermaid
+---
+title: display_setup_channel flowchart
+config:
+    theme: forest
+    curve: basis
+---
+flowchart LR
+    Start([Start]) -->A[Controller Setup: Lấy thông tin của channel ] --> B[Channel: Gọi api] --> C{Thông tin của shop} 
+    C --> |Không có thông tin| E[Trả về lỗi] --> End([End])
+    C --> |Có thể gọi api| F[Trả về thông tin] --> End
+```
+### Function: `set_channel_identifier`
+> set_channel_identifier là một function để lưu lại thông tin của channel
+```mermaid 
+---
+title: set_channel_identifier flowchart
+config: 
+    theme: forest
+    curve: basis
+---
+flowchart LR
+A[display_setup_channel] --> b{response}
+b --> |error| c[Trả về lỗi]
+b --> |success| d[set_identifier: Thông tin của channel]
+```
+
+---
 ## Action
-***
 ### Action: `Setup channel`
 > Setup channel Là một action để lấy và kiểm tra thông tin của channel
 - function required: 
@@ -17,25 +50,18 @@
     + `get_channel_info: ->(Response)`: Gọi và kiểm tra thông tin đã được cung cấp bởi channel
     + `set_channel_identifier: ->(Response)`: Lưu lại thông tin của channel
 - Flow:
-``` get_api_info -> display_setup_channel -> set_channel_identifier ```
-- Chart:
-    + display_setup_channel
-    ```mermaid
-    flowchart LR
-        Start([Start]) -->A[Controller Setup: Lấy thông tin của channel ] --> B[Channel: Gọi api] --> C{Thông tin của shop} 
-        C --> |Không có thông tin| E[Trả về lỗi] --> End([End])
-        C --> |Có thể gọi api| F[Trả về thông tin] --> End
-    ```
-    + set_channel_identifier
-    With return value of 'display_setup_channel' function
-    ```mermaid 
-    flowchart LR
-    A[display_setup_channel] --> b{response}
-    b --> |error| c[Trả về lỗi]
-    b --> |success| d[set_identifier: Thông tin của channel]
-    ```
-- Controler Process:
 ```mermaid
+    flowchart LR 
+    A[get_api_info] --> B[get_channel_info] --> C[set_channel_identifier]
+```
+- Process:
+```mermaid
+---
+title: Setup channel action
+config: 
+    theme: forest
+    curve: basis
+---
 sequenceDiagram
     Actor A as litC_system
     box sync_core
@@ -43,7 +69,7 @@ sequenceDiagram
         participant D as State
         participant C as Channel
     end
-    ACTOR E as Channel_SYSTEM
+    ACTOR E as Channel_system
     A->>+B:Request setup channel
     B->>+C:display_setup_channel
     C->>E:call check api
@@ -74,6 +100,9 @@ sequenceDiagram
     + `convert_{entity}_import: ->(entity_Data)`: Thực hiện việc chuyển đổi dữ liệu của `entity` thành dữ liệu của `entity` trong database. Cấu trúc của `entity` trong database được định nghĩa thông qua contruct class(model) của `entity`
     + `{entity}_import`: Thực hiện việc lưu dữ liệu của `entity` vào database
     + `after_{entity}_import`: Hâu xử lý sau khi lưu dữ liệu của `entity` vào database
+    > **Note:** `"entity"` là tên của `entity` cần pull  
+    function `{entity}_import` và `after_{entity}_import` được xử lý tại file warehouse.
+    còn lại sẽ được xử lý tại file channel tương ứng với channel
 - Flow:
 ```mermaid
     flowchart LR 
@@ -84,6 +113,9 @@ sequenceDiagram
     ```mermaid
     ---
     title: Display_pull_channel flowchart
+    config: 
+        theme: forest
+        curve: basis 
     ---
     flowchart LR
         A[Controller Pull: Lấy dữ liệu từ state ] --> B[Channel: Gọi api] --> C{Số lượng của entity} 
@@ -95,6 +127,9 @@ sequenceDiagram
     ```mermaid 
     ---
     title: get_{entity}_main_export flowchart tổng quát
+    config: 
+        theme: forest
+        curve: basis 
     ---
     flowchart LR
      Start([Start])-->A[Lấy dữ liệu từ state] --> B[Khởi tạo params, request body] --> C[Truy vấn API] --> D[Xử lý] --> End([End: Trả về dữ liệu])
@@ -102,10 +137,10 @@ sequenceDiagram
 
     ```mermaid
     ---
-        title: get_{entity}_main_export flowchart chi tiết
-        config: 
-            theme: forest
-            curve: basis 
+    title: get_{entity}_main_export flowchart chi tiết
+    config: 
+        theme: forest
+        curve: basis 
     ---
     flowchart LR
     START([Start])-->A{kiểm tra trạng thái lần cuối}
@@ -128,33 +163,24 @@ sequenceDiagram
             curve: basis
     ---
     flowchart LR
-    START([Start])-->Data(maindata) --> A{id}
-    A --> |Có dữ liệu| B[Truy vấn API]
-    %%MAP extdata to maindata[id]%%
-    B --> C[Merge dữ liệu]
-    C --> End([End])
-    A --> End([End])
+    START([Start])-->Data(maindata) --> A[Maindata id list]
+    A --> B[Truy vấn API]
+    B --> C[Merge dữ liệu] --> Data 
+    B --> Q{next id}
+    Q -->|true| A
+    Q -->|false| End([Response Data])
     ```
-    ```mermaid
-    sequenceDiagram 
-        participant C as Controller
-        participant B as Channel
-        participant A as Action
-        C->>B: get_{entity}_ext
-        loop for id in maindata
-            B->>A: id
-            alt có id
-                A->>A: Truy vấn API
-                A->>B: API data
-                B->>B: Maping data
-            else không có id
-                A->>B: flag[end]
-            end
-        end
-        B->>C: Extdata
-    ```
-
     + check_{entity}_import
     > WIP
 
     + convert_{entity}_import
+    ```mermaid
+    ---
+        title: convert_{entity}_import flowchart
+        config: 
+            theme: forest
+            curve: basis
+    ---
+    flowchart LR
+    START([Start])-->Data(entity_data) --> A[Check data] --> B[Convert data] --> End([Response Data])
+    ```
