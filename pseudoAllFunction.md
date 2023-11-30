@@ -58,18 +58,6 @@
     flowchart LR
         A[Controller Pull: Lấy dữ liệu từ state ] --> B[Channel: Gọi api] --> C{Số lượng của entity} 
         C --> |Không có thông tin| E[Trả về lỗi]
-        C --> |Có thể gọi api| F[Trả về số lượng]
-    ```
-    basic
-    ```mermaid
-    stateDiagram
-        [*] --> A[kiểm tra process yêu cầu entity nào]
-        A --> B[Lấy dữ liệu từ state]
-        B --> C[Thực hiện việc tạo param/request_body]
-        C --> D[Gọi api]
-        D --> E[Trả về response]
+        C --> |Có thể gọi api| F[Trả về/lưu vào state]
     ```
     + get_{entity}_main_export
-    ```mermaid
-    basic
-    ```
