@@ -1,8 +1,16 @@
 # Pseudo code for all functions and actions
 ---
+## Table of contents
+- [Pseudo code for all functions and actions](#pseudo-code-for-all-functions-and-actions)
+  - [Table of contents](#table-of-contents)
+  - [Action](#action)
+    - [Action: `Setup channel`](#action-setup-channel)
+    - [Action: `Pull channel`](#action-pull-channel)
+---
 ## Action
+***
 ### Action: `Setup channel`
-    Setup channel Là một action để lấy và kiểm tra thông tin của channel
+> Setup channel Là một action để lấy và kiểm tra thông tin của channel
 - function required: 
     + `get_api_info: ->(dict)`: Trả về thông tin cần thiết để gọi api của channel
         Ex: A shopify channel will need: shop_name, api_password so this function will return a dict with 2 keys: shop_name and api_password
@@ -26,21 +34,37 @@
     b --> |error| c[Trả về lỗi]
     b --> |success| d[set_identifier: Thông tin của channel]
     ```
-    + Process:
-    ```mermaid
-    sequenceDiagram
-        participant C as Controller
-        participant B as Channel
-        participant A as Action
-        C->>A: get_api_info
-        A->>B: display_setup_channel
-        B->>A: response
-        A->>A: check response
-        A->>A: set_channel_identifier
-        A->>C: return
-    ```
+- Controler Process:
+```mermaid
+sequenceDiagram
+    Actor A as litC_system
+    box sync_core
+        participant B as Controller
+        participant C as Channel
+        participant D as State
+    end
+    ACTOR E as Channel_SYSTEM
+    A->>+B:Request setup channel
+    B->>+C:display_setup_channel
+    C->>E:call check api
+    activate E
+    E-->>C:response
+    deactivate E
+    C-->>C:check response<br>validation api info
+    par Response Error
+        C-->>B:error
+        B-->>A:error
+    and Response Success
+        C-->>B:success
+        B-)D:save channel info
+        B-->>A:success
+        deactivate C
+    end
+    deactivate B
+```
+***
 ### Action: `Pull channel`
-    Pull channel là một action để lấy thông tin(product,category,order,...) từ channel channel
+> Pull channel là một action để lấy thông tin(product,category,order,...) từ channel channel
 - function required(for channel file only):
     + `Display_pull_channel: ->(Response)`: Thực hiện việc gọi api đến channel để lấy số lượng của `entity` cần pull. Sau khi lấy được số lượng thực hiện việc lưu vào `_state` của `entity` tương ứng
     + `get_{entity}_main_export: ->(Response: entity_Data)`: Thực hiện việc gọi APi để lấy dữ liệu của `entity` theo phân trang. Trả về data_pack chứa dữ liệu của `entity`
@@ -129,3 +153,8 @@
         end
         B->>C: Extdata
     ```
+
+    + check_{entity}_import
+    > WIP
+
+    + convert_{entity}_import
