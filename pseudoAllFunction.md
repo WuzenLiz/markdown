@@ -40,8 +40,8 @@ sequenceDiagram
     Actor A as litC_system
     box sync_core
         participant B as Controller
-        participant C as Channel
         participant D as State
+        participant C as Channel
     end
     ACTOR E as Channel_SYSTEM
     A->>+B:Request setup channel
