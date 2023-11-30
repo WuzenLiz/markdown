@@ -13,9 +13,9 @@
     + display_setup_channel
     ```mermaid
     flowchart LR
-        A[Controller Setup: Lấy thông tin của channel ] --> B[Channel: Gọi api] --> C{Thông tin của shop} 
-        C --> |Không có thông tin| E[Trả về lỗi]
-        C --> |Có thể gọi api| F[Trả về thông tin]
+        Start([Start]) -->A[Controller Setup: Lấy thông tin của channel ] --> B[Channel: Gọi api] --> C{Thông tin của shop} 
+        C --> |Không có thông tin| E[Trả về lỗi] --> End([End])
+        C --> |Có thể gọi api| F[Trả về thông tin] --> End
     ```
     + set_channel_identifier
     With return value of 'display_setup_channel' function
@@ -53,11 +53,35 @@
 ``` Display_pull_channel -> get_{entity}_main_export -> get_{entity}_ext -> check_{entity}_import -> convert_{entity}_import -> {entity}_import -> after_{entity}_import ```
 - Chart:
     + Display_pull_channel
-    flow
     ```mermaid
+    ---
+    title: Display_pull_channel flowchart
+    ---
     flowchart LR
         A[Controller Pull: Lấy dữ liệu từ state ] --> B[Channel: Gọi api] --> C{Số lượng của entity} 
         C --> |Không có thông tin| E[Trả về lỗi]
         C --> |Có thể gọi api| F[Trả về/lưu vào state]
     ```
     + get_{entity}_main_export
+    ```mermaid 
+    ---
+    title: get_{entity}_main_export flowchart tổng quát
+    ---
+    flowchart LR
+     A[Lấy dữ liệu từ state] --> B[Khởi tạo params, request body] --> C[Truy vấn API] --> D[Xử lý và trả về dữ liệu]
+    ```
+
+    ```mermaid
+    %%{init: {"flowchart": {"htmlLabels": Xử lý chi tiết}} }%%
+    flowchart TD
+    START([Start])-->A{kiểm tra trạng thái lần cuối}
+    A --> |Đã hoàn thành| End([End])
+    A --> |Chưa hoàn thành| B[Khởi tạo params, request body]
+    B --> C[Truy vấn API] --> D{Kiểm tra phân trang}
+    D --> |Có phân trang: trang tiếp theo| E[Lưu lại url phân trang] --> F1{kiểm tra dữ liệu entity}
+    D --> |không có phân trang| F2{kiểm tra dữ liệu entity} 
+    F1 --> |Có dữ liệu| F[Trả về dữ liệu] --> H[trả về Response: entity_Data] --> End
+    F1 --> |Không có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
+    F2 --> |Có dữ liệu| F[Trả về dữ liệu] --> G[Flag trạng thái đã hoàn thành] --> H[trả về Response: entity_Data] --> End
+    F2 --> |Không có dữ liệu| G[Flag trạng thái đã hoàn thành] --> End
+    ```
