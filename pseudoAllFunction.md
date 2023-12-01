@@ -219,6 +219,7 @@ sequenceDiagram
     A->>+B:Request pull channel 
     B->>+D:Get state, settings
     D-->>-B:data
+    activate C
     B->>+C:display_pull_channel
     C->>+E:call API: Check, get count data
     E-->>-C:response
@@ -229,7 +230,8 @@ sequenceDiagram
     and If Response Success
         C-)D:Save state
         C-->>B:Response
-        loop get_data
+        deactivate C
+        loop GET IMPORT ENTITY DATA
             B->>B:check state
             par If Have next page
                 B->>+C:get_{entity}_main_export
@@ -248,7 +250,6 @@ sequenceDiagram
                     B-)D:Entity_import
                     B-)D:after_entity_import
                     deactivate C
-                    B-->>B:check next page, state
                 end
                 B-->>A:Response
             and If Not have next page
