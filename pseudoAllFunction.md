@@ -230,28 +230,29 @@ sequenceDiagram
         C-)D:Save state
         C-->>B:Response
         loop get_data
-            B->>+C:get_{entity}_main_export
-            C->>+E:call API: get data
-            E-->>-C:response
-            C-->>C:check response<br>validation api info
-            par If Response Error
-                C-->>B:error
-                B-->>A:error
-            and If Response Success
-                C->>+B:check_entity_import
-                B->>+D:check data
-                D-->>-B:response
-                B-->>C:response
-                C->>+B:convert_entity_import
-                create participant Warehouse_controller as F
-                B->>+F:Entity_data
-                F->>+D:Entity_import
-                D-->>-F:Response
-                F->>+D:after_entity_import
-                D-->>-F:response
-                destroy F
-                B-->>A:response
-                deactivate C
+            B->>B:check state
+            par If Have next page
+                B->>+C:get_{entity}_main_export
+                C->>+E:call API: get data
+                E-->>-C:response
+                C->>C:check response<br>validation api info
+                par If Response Error
+                    C-->>B:error
+                    B-->>A:error
+                and If Response Success
+                    C->>B:check_entity_import
+                    B->>+D:check data
+                    D-->>-B:response
+                    B-->>C:response
+                    C->>B:convert_entity_import
+                    B-)D:Entity_import
+                    B-)D:after_entity_import
+                    deactivate C
+                    B-->>B:check next page, state
+                end
+                B-->>A:Response
+            and If Not have next page
+                B-->>A:Response
             end
             deactivate B
         end
