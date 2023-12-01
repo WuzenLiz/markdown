@@ -200,5 +200,59 @@ còn lại sẽ được xử lý tại file channel tương ứng với channel
     flowchart LR 
     A[Display_pull_channel] --> B[get_entity_main_export] --> C[get_entity_ext] --> D[check_entity_import] --> E[convert_entity_import] --> F[entity_import] --> G[after_entity_import]
 ```
-- Chart:
-(WIP)
+- Process:
+```mermaid
+---
+title: Pull channel action
+config: 
+    theme: forest
+    curve: basis
+---
+sequenceDiagram
+    Actor A as litC_system
+    box sync_core
+        participant B as Main_Controller
+        participant D as Storage
+        participant C as Channel_controller
+    end
+    ACTOR E as Channel_system
+    A->>+B:Request pull channel 
+    B->>+D:Get state, settings
+    D-->>-B:data
+    B->>+C:display_pull_channel
+    C->>+E:call API: Check, get count data
+    E-->>-C:response
+    C-->>C:check response<br>validation api info
+    par If Response Error
+        C-->>B:error
+        B-->>A:error
+    and If Response Success
+        C-)D:Save state
+        C-->>B:Response
+        loop get_data
+            B->>+C:get_{entity}_main_export
+            C->>+E:call API: get data
+            E-->>-C:response
+            C-->>C:check response<br>validation api info
+            par If Response Error
+                C-->>B:error
+                B-->>A:error
+            and If Response Success
+                C->>+B:check_entity_import
+                B->>+D:check data
+                D-->>-B:response
+                B-->>C:response
+                C->>+B:convert_entity_import
+                B->>+D:convert data
+                D-->>-B:response
+                B->>+D:save data
+                D-->>-B:response
+                B->>+D:after_entity_import
+                D-->>-B:response
+                B-->>A:response
+                deactivate C
+            end
+            deactivate B
+        end
+    end
+```
