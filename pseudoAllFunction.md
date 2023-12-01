@@ -243,12 +243,13 @@ sequenceDiagram
                 D-->>-B:response
                 B-->>C:response
                 C->>+B:convert_entity_import
-                B->>+D:convert data
-                D-->>-B:response
-                B->>+D:save data
-                D-->>-B:response
-                B->>+D:after_entity_import
-                D-->>-B:response
+                create participant F as Warehouse_controller
+                B->>+F:Entity_data
+                F->>+D:Entity_import
+                D-->>-F:Response
+                F->>+D:after_entity_import
+                D-->>-F:response
+                destroy F
                 B-->>A:response
                 deactivate C
             end
