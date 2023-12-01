@@ -205,7 +205,7 @@ còn lại sẽ được xử lý tại file channel tương ứng với channel
 ---
 title: Pull channel action
 config: 
-    theme: forest
+    theme: base
     curve: basis
 ---
 sequenceDiagram
