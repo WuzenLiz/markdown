@@ -243,7 +243,7 @@ sequenceDiagram
                 D-->>-B:response
                 B-->>C:response
                 C->>+B:convert_entity_import
-                create participant F as Warehouse_controller
+                create participant Warehouse_controller as F
                 B->>+F:Entity_data
                 F->>+D:Entity_import
                 D-->>-F:Response
