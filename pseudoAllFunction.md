@@ -1,4 +1,4 @@
-#Chart
+# Chart
 ---
 ## Table of contents
 - [Table of contents](#table-of-contents)
@@ -43,9 +43,9 @@ config:
     curve: basis
 ---
 flowchart LR
-A[display_setup_channel] --> b{response}
-b --> |error| c[Trả về lỗi]
-b --> |success| d[set_identifier: Thông tin của channel]
+    Start([start]) --> A[display_setup_channel] --> b{response}
+    b --> |error| c[Trả về lỗi] --> End([End])
+    b --> |success| d[set_identifier: Thông tin của channel] --> End
 ```
 
 ### Function: `Display_pull_channel`
@@ -58,9 +58,9 @@ config:
     curve: basis 
 ---
 flowchart LR
-    A[Controller Pull: Lấy dữ liệu từ state ] --> B[Channel: Gọi api] --> C{Số lượng của entity} 
-    C --> |Không có thông tin| E[Trả về lỗi]
-    C --> |Có thể gọi api| F[Trả về/lưu vào state]
+    Start([start])-->A[Controller Pull: Lấy dữ liệu từ state ] --> B[Channel: Gọi api] --> C{Số lượng của entity} 
+    C --> |Không có thông tin| E[Trả về lỗi] --> End([End])
+    C --> |Có thể gọi api| F[Trả về/lưu vào state] --> End
 ```
 
 ### Function: `get_{entity}_main_export`
@@ -84,15 +84,15 @@ config:
     curve: basis 
 ---
 flowchart LR
-START([Start])-->A{kiểm tra trạng thái lần cuối}
-A --> |Đã hoàn thành| End([Trả về Response])
-A --> |Chưa hoàn thành| B[Khởi tạo params,<br>request body] --> C[Truy vấn API] --> D{Kiểm tra phân trang}
-D --> |Có phân trang: trang tiếp theo| E[Lưu lại url phân trang] --> F1{kiểm tra dữ liệu entity}
-D --> |không có phân trang| F1{kiểm tra dữ liệu entity} 
-F1 --> |Có dữ liệu| End
-F1 --> |Không có dữ liệu| G[Flag trạng thái<br>đã hoàn thành] --> End
-F1 --> |Có dữ liệu| G --> End
-F1 --> |Không có dữ liệu| G --> End
+    START([Start])-->A{kiểm tra trạng thái lần cuối}
+    A --> |Đã hoàn thành| End([Trả về Response])
+    A --> |Chưa hoàn thành| B[Khởi tạo params,<br>request body] --> C[Truy vấn API] --> D{Kiểm tra phân trang}
+    D --> |Có phân trang: trang tiếp theo| E[Lưu lại url phân trang] --> F1{kiểm tra dữ liệu entity}
+    D --> |không có phân trang| F1{kiểm tra dữ liệu entity} 
+    F1 --> |Có dữ liệu| End
+    F1 --> |Không có dữ liệu| G[Flag trạng thái<br>đã hoàn thành] --> End
+    F1 --> |Có dữ liệu| G --> End
+    F1 --> |Không có dữ liệu| G --> End
 ```
 
 ### Function: `get_{entity}_ext`
@@ -106,12 +106,12 @@ Ex: metafield của product trong shopify
         curve: basis
 ---
 flowchart LR
-START([Start])-->Data(maindata) --> A[Maindata id list]
-A --> B[Truy vấn API]
-B --> C[Merge dữ liệu] --> Data 
-B --> Q{next id}
-Q -->|true| A
-Q -->|false| End([Response Data])
+    START([Start])-->Data(maindata) --> A[Maindata id list]
+    A --> B[Truy vấn API]
+    B --> C[Merge dữ liệu] --> Data 
+    B --> Q{next id}
+    Q -->|true| A
+    Q -->|false| End([Response Data])
 ```
 
 ### Function: `convert_{entity}_import`
@@ -124,8 +124,14 @@ Q -->|false| End([Response Data])
         curve: basis
 ---
 flowchart LR
-START([Start])-->Data(entity_data) --> A[Check data] --> B[Convert data] --> End([Response Data])
+    START([Start])-->Data(entity_data) --> A[Check data] --> B[Convert data] --> End([Response Data])
 ```
+
+
+### Function: `{entity}_import`
+> Thực hiện việc lưu dữ liệu của `entity` vào database *Đối với file warehouse*
+Thực hiện việc import dữ liệu của `entity` vào platform *Đối với file channel*
+
 ---
 ## Action
 
@@ -163,10 +169,10 @@ sequenceDiagram
     E-->>C:response
     deactivate E
     C-->>C:check response<br>validation api info
-    par Response Error
+    par If Response Error
         C-->>B:error
         B-->>A:error
-    and Response Success
+    and If Response Success
         C-->>B:success
         B-)D:save channel info
         B-->>A:success
@@ -177,13 +183,15 @@ sequenceDiagram
 
 ### Action: `Pull channel`
 > Pull channel là một action để lấy thông tin(product,category,order,...) từ channel channel
-- function required(for channel file only):
-    + [`Display_pull_channel: ->(Response)`](#function-Display_pull_channel)
-    + [`get_{entity}_main_export: ->(Response: entity_Data)`](#function-get_{entity}_main_export)
-    + [`get_{entity}_ext: ->(Response: entity_Data)`](#function-get_{entity}_ext)
-    + [`convert_{entity}_import: ->(entity_Data)`](#function-convert_{entity}_import)
-    + `{entity}_import`: Thực hiện việc lưu dữ liệu của `entity` vào database
-    + `after_{entity}_import`: Hâu xử lý sau khi lưu dữ liệu của `entity` vào database
+- function required:
+    - **In Channel**
+        + [`Display_pull_channel: ->(Response)`](#function-Display_pull_channel)
+        + [`get_{entity}_main_export: ->(Response: entity_Data)`](#function-get_{entity}_main_export)
+        + [`get_{entity}_ext: ->(Response: entity_Data)`](#function-get_{entity}_ext)
+        + [`convert_{entity}_import: ->(entity_Data)`](#function-convert_{entity}_import)
+    - **In Warehouse**
+        + `{entity}_import`: Thực hiện việc lưu dữ liệu của `entity` vào database
+        + `after_{entity}_import`: Hâu xử lý sau khi lưu dữ liệu của `entity` vào database
 > **Note:** `"entity"` là tên của `entity` cần pull  
 function `{entity}_import` và `after_{entity}_import` được xử lý tại file warehouse.
 còn lại sẽ được xử lý tại file channel tương ứng với channel
